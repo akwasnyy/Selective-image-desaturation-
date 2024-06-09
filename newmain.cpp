@@ -5,6 +5,7 @@
 #include <wx/image.h>
 #include <wx/radiobox.h>
 #include <wx/slider.h>
+#include <thread>
 class MyApp : public wxApp {
 public:
     virtual bool OnInit();
@@ -16,6 +17,7 @@ public:
     void OnOpen(wxCommandEvent& event);
     void OnExit(wxCommandEvent& event);
     void OnAbout(wxCommandEvent& event);
+
     
 
 private:
@@ -113,10 +115,17 @@ void MyFrame::OnOpen(wxCommandEvent& event) {
     if (!filePath.empty()) {
         cv::Mat image = cv::imread(filePath.ToStdString(), cv::IMREAD_COLOR);
 
+        //zaimplementowac jakis display handler czy cos idk
         if (!image.empty()) {
             cv::imshow("Original image", image);  // Pierwsze okno
             cv::imshow("Desaturated image", image);  // Drugie okno
-            cv::waitKey(0); // Czekaj na naciœniêcie klawisza w dowolnym oknie
+           // cv::waitKey(0); // Czekaj na naciœniêcie klawisza w dowolnym oknie
+            while (true) {
+                cv::waitKey(100);
+                if (cv::getWindowProperty("Original image", cv::WND_PROP_VISIBLE) <= 0.0 || cv::getWindowProperty("Desaturated image", cv::WND_PROP_VISIBLE) <= 0.0)
+                    break;
+            }
+            cv::destroyAllWindows();
         }
         else {
             wxLogError("Cannot open or find the image.");
