@@ -19,12 +19,13 @@ public:
     void OnExit(wxCommandEvent& event);
     void OnAbout(wxCommandEvent& event);
     void OnSliderChange(wxCommandEvent& event);
-
-    
+    void OnUpdate(wxTimerEvent& event);
+    ~MyFrame();
 
 private:
     wxDECLARE_EVENT_TABLE();
     
+    wxTimer timer;
 
     wxSlider* brightnessSlider;
     wxSlider* rSlider;
@@ -38,6 +39,13 @@ private:
     wxStaticText* r_txt;
     wxStaticText* g_txt;
     wxStaticText* b_txt;
+
+    int brightness_val=0;
+    int R_val=0;
+    int G_val=0;
+    int B_val=0;
+
+    void desaturate();
 };
 
 
@@ -48,7 +56,8 @@ enum {
     ID_Brightness=100,
     ID_R,
     ID_G,
-    ID_B
+    ID_B,
+    ID_Timer
     
 };
 
@@ -61,6 +70,7 @@ EVT_SLIDER(ID_Brightness, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_R, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_G, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_B, MyFrame::OnSliderChange)
+EVT_TIMER(ID_Timer, MyFrame::OnUpdate)
 wxEND_EVENT_TABLE()
 
 
@@ -75,7 +85,7 @@ bool MyApp::OnInit() {
 }
 
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
-    : wxFrame(NULL, wxID_ANY, title, pos, size) {
+    : wxFrame(NULL, wxID_ANY, title, pos, size), timer(this,ID_Timer) {
     wxMenu* menuFile = new wxMenu;
     menuFile->Append(ID_Open, "&Open...\tCtrl-O", "Open an image file");
     menuFile->Append(ID_Save, "&Save...\tCtrl-S", "Save the current image"); // Add Save option
@@ -119,21 +129,44 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
 
     CreateStatusBar();
     SetStatusText("Selective Image Desaturation v0.2");
+
+    timer.Start(5);
 }
 
 
+void MyFrame::OnUpdate(wxTimerEvent& event)
+{
+    if (cv::getWindowProperty("Original image", cv::WND_PROP_VISIBLE) <= 0.0 ||
+        cv::getWindowProperty("Desaturated image", cv::WND_PROP_VISIBLE) <= 0.0) {
+        cv::destroyAllWindows();
+        original.release();
+        desaturated.release();
+    }
+
+    if (!original.empty() && !desaturated.empty()) {
+            
+
+            desaturate();
+            cv::imshow("Original image", original);
+            cv::imshow("Desaturated image", desaturated);
+           
+    }
+
+}
 
 
 void MyFrame::OnSliderChange(wxCommandEvent& event) {
-    int brightnessValue = brightnessSlider->GetValue();
-    int rValue = rSlider->GetValue();
-    int gValue = gSlider->GetValue();
-    int bValue = bSlider->GetValue();
+    brightness_val = brightnessSlider->GetValue();
+    R_val = rSlider->GetValue();
+    G_val = gSlider->GetValue();
+    B_val = bSlider->GetValue();
     //tutaj wrzucic logike
-    brightness_txt->SetLabel(wxString::Format("Brightness=%d", brightnessValue));
-    r_txt->SetLabel(wxString::Format("R=%d", rValue));
-    g_txt->SetLabel(wxString::Format("G=%d", gValue));
-    b_txt->SetLabel(wxString::Format("B=%d", bValue));
+    brightness_txt->SetLabel(wxString::Format("Brightness=%d", brightness_val));
+    r_txt->SetLabel(wxString::Format("R=%d", R_val));
+    g_txt->SetLabel(wxString::Format("G=%d", G_val));
+    b_txt->SetLabel(wxString::Format("B=%d", B_val));
+
+    
 }
 
 void MyFrame::OnOpen(wxCommandEvent& event) {
@@ -145,15 +178,10 @@ void MyFrame::OnOpen(wxCommandEvent& event) {
         desaturated = original.clone();
         //zaimplementowac jakis display handler czy cos idk
         if (!desaturated.empty()) {
-            cv::imshow("Original image", original);  // Pierwsze okno
-            cv::imshow("Desaturated image", desaturated);  // Drugie okno
-           // cv::waitKey(0); // Czekaj na naciœniêcie klawisza w dowolnym oknie
-            while (true) {
-                cv::waitKey(100);
-                if (cv::getWindowProperty("Original image", cv::WND_PROP_VISIBLE) <= 0.0 || cv::getWindowProperty("Desaturated image", cv::WND_PROP_VISIBLE) <= 0.0)
-                    break;
-            }
-            cv::destroyAllWindows();
+            cv::namedWindow("Original image", cv::WINDOW_NORMAL);  // Pierwsze okno
+            cv::namedWindow("Desaturated image", cv::WINDOW_NORMAL);  // Drugie okno
+           
+           
         }
         else {
             wxLogError("Cannot open or find the image.");
@@ -186,4 +214,39 @@ void MyFrame::OnSave(wxCommandEvent& event) {
             wxLogError("Failed to save the image.");
         }
     }
+}
+
+void MyFrame::desaturate()
+{
+    desaturated = original.clone();
+    int mode = 1; //mode dla cb kwasny
+    for (int y = 0; y < desaturated.rows; ++y) {
+        for (int x = 0; x < desaturated.cols; ++x) {
+            cv::Vec3b intensity = desaturated.at<cv::Vec3b>(y, x);
+            int b = intensity[0];
+            int g = intensity[1];
+            int r = intensity[2];
+
+            if (mode == 1) {  // RGB mode
+                if (r > R_val || g > G_val || b > B_val) {
+                    continue;
+                }
+            }
+            else if (mode == 0) {  // Brightness mode
+                int brightness = (r + g + b) / 3;
+                if (brightness > brightness_val) {
+                    continue;
+                }
+            }
+            // Apply grayscale
+            int gray = (r + g + b) / 3;
+            desaturated.at<cv::Vec3b>(y, x) = cv::Vec3b(gray, gray, gray);
+        }
+    }
+
+   
+}
+
+MyFrame::~MyFrame() {
+    timer.Stop();
 }
