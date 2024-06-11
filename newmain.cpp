@@ -20,6 +20,7 @@ public:
     void OnAbout(wxCommandEvent& event);
     void OnSliderChange(wxCommandEvent& event);
     void OnUpdate(wxTimerEvent& event);
+    void OnModeChange(wxCommandEvent& event);
     ~MyFrame();
 
 private:
@@ -31,6 +32,7 @@ private:
     wxSlider* rSlider;
     wxSlider* gSlider;
     wxSlider* bSlider;
+    wxRadioBox* modeRadioBox;
 
     cv::Mat original;
     cv::Mat desaturated;
@@ -44,8 +46,10 @@ private:
     int R_val=0;
     int G_val=0;
     int B_val=0;
+    int selection = 0;
 
     void desaturate();
+    void UpdateSliders();
 };
 
 
@@ -57,7 +61,8 @@ enum {
     ID_R,
     ID_G,
     ID_B,
-    ID_Timer
+    ID_Timer,
+    ID_Mode
     
 };
 
@@ -71,6 +76,7 @@ EVT_SLIDER(ID_R, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_G, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_B, MyFrame::OnSliderChange)
 EVT_TIMER(ID_Timer, MyFrame::OnUpdate)
+EVT_RADIOBOX(ID_Mode, MyFrame::OnModeChange)
 wxEND_EVENT_TABLE()
 
 
@@ -79,7 +85,7 @@ wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit() {
     wxInitAllImageHandlers(); // Inicjalizacja obs³ugi ró¿nych formatów obrazów
-    MyFrame* frame = new MyFrame("Selective Image Desaturation", wxPoint(50, 50), wxSize(450, 340));
+    MyFrame* frame = new MyFrame("Selective Image Desaturation", wxPoint(50, 50), wxSize(600, 400));
     frame->Show(true);
     return true;
 }
@@ -106,31 +112,33 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 45));
     brightnessSlider = new wxSlider(panel, ID_Brightness, 0, 0, 255, wxPoint(20, 20), wxSize(300, -1), wxSL_HORIZONTAL);
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 45));
-    //new wxStaticText(panel, wxID_ANY, "Brightness", wxPoint(20, 5));
     brightness_txt= new wxStaticText(panel, wxID_ANY, "Brightness=0", wxPoint(20,5));
 
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 105));
     rSlider = new wxSlider(panel, ID_R, 0, 0, 255, wxPoint(20, 80), wxSize(300, -1), wxSL_HORIZONTAL);
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 105));
-    //new wxStaticText(panel, wxID_ANY, "R", wxPoint(20, 65));
     r_txt = new wxStaticText(panel, wxID_ANY, "R=0", wxPoint(20,65));
 
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 165));
     gSlider = new wxSlider(panel, ID_G, 0, 0, 255, wxPoint(20, 140), wxSize(300, -1), wxSL_HORIZONTAL);
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 165));
-    //new wxStaticText(panel, wxID_ANY, "G", wxPoint(20, 125));
     g_txt = new wxStaticText(panel, wxID_ANY, "G=0", wxPoint(20,125));
 
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 225));
     bSlider = new wxSlider(panel, ID_B, 0, 0, 255, wxPoint(20, 200), wxSize(300, -1), wxSL_HORIZONTAL);
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 225));
-    //new wxStaticText(panel, wxID_ANY, "B", wxPoint(20, 185));
     b_txt = new wxStaticText(panel, wxID_ANY, "B=0", wxPoint(20,185));
 
+    wxString choices[] = { "Brightness", "RGB" };
+    modeRadioBox = new wxRadioBox(panel, ID_Mode, "Mode", wxPoint(400, 20), wxDefaultSize, 2, choices, 1, wxRA_SPECIFY_COLS);
+    modeRadioBox->SetSelection(0); // Default to Brightness mode
+    
     CreateStatusBar();
     SetStatusText("Selective Image Desaturation v0.2");
 
-    timer.Start(5);
+    timer.Start(10);
+    UpdateSliders(); // Initialize slider states
+  
 }
 
 
@@ -166,7 +174,7 @@ void MyFrame::OnSliderChange(wxCommandEvent& event) {
     g_txt->SetLabel(wxString::Format("G=%d", G_val));
     b_txt->SetLabel(wxString::Format("B=%d", B_val));
 
-    
+   
 }
 
 void MyFrame::OnOpen(wxCommandEvent& event) {
@@ -194,7 +202,7 @@ void MyFrame::OnExit(wxCommandEvent& event) {
 }
 
 void MyFrame::OnAbout(wxCommandEvent& event) {
-    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard", "Get some help", wxOK | wxICON_INFORMATION);
+    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the brightness or RGB threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.", "Get some help", wxOK | wxICON_INFORMATION);
 }
 
 void MyFrame::OnSave(wxCommandEvent& event) {
@@ -219,7 +227,7 @@ void MyFrame::OnSave(wxCommandEvent& event) {
 void MyFrame::desaturate()
 {
     desaturated = original.clone();
-    int mode = 1; //mode dla cb kwasny
+    int mode = selection; //mode dla cb kwasny
     for (int y = 0; y < desaturated.rows; ++y) {
         for (int x = 0; x < desaturated.cols; ++x) {
             cv::Vec3b intensity = desaturated.at<cv::Vec3b>(y, x);
@@ -247,6 +255,36 @@ void MyFrame::desaturate()
    
 }
 
+void MyFrame::OnModeChange(wxCommandEvent& event) {
+    UpdateSliders();
+}
+
 MyFrame::~MyFrame() {
     timer.Stop();
+}
+
+void MyFrame::UpdateSliders() {
+    selection = modeRadioBox->GetSelection();
+    if (selection == 0) { // Brightness mode
+        brightnessSlider->Enable();
+        brightness_txt->Enable();
+
+        rSlider->Disable();
+        r_txt->Disable();
+        gSlider->Disable();
+        g_txt->Disable();
+        bSlider->Disable();
+        b_txt->Disable();
+    }
+    else { // RGB mode
+        brightnessSlider->Disable();
+        brightness_txt->Disable();
+
+        rSlider->Enable();
+        r_txt->Enable();
+        gSlider->Enable();
+        g_txt->Enable();
+        bSlider->Enable();
+        b_txt->Enable();
+    }
 }
