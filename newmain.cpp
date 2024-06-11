@@ -248,12 +248,12 @@ void MyFrame::desaturate()
 {
     desaturated = original.clone();
     int mode = selection; //mode dla cb kwasny ~ oki:>>
-    cv::Vec3b desaturation;
+   
     int low_desaturation_value = std::max(0, lightness_val - partial_desaturation_value);
 
     for (int y = 0; y < desaturated.rows; ++y) {
         for (int x = 0; x < desaturated.cols; ++x) {
-            bool is_partial = false;
+            //bool is_partial = false;
             cv::Vec3b intensity = desaturated.at<cv::Vec3b>(y, x);
             int b = intensity[0];
             int g = intensity[1];
@@ -292,14 +292,17 @@ void MyFrame::desaturate()
             if (H < 0)
                 H += 360;
             //tutaj skonczylem zamieniac rgb na hsl
-            double factor = 1; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia
+            double factor = 0; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia
             cv::Vec3b HSL_color(H, S, L);
             if (mode == 1) { // RGB mode
-                //tu na razie skip x d               
+                //tu na razie skip x d todo: partial desaturation przy rgb ale to juz formalnosc teraz              
               
                 if ((r > R_val || g > G_val || b > B_val)) {
                     continue; 
                 }
+                //na razie roboczo:
+                S = S*factor; //czyli 0, domyslnie bedzie else if ktory bedzie sprawdzal partial desaturation i obliczal inny factor w razie potrzeby
+                //S=0 oznacza calkowita desaturacje
 
             }
             else if (mode == 0) {  // lightness mode
@@ -307,62 +310,60 @@ void MyFrame::desaturate()
                 if (L > lightness_val / 255.0)
                     continue; //dziele tu wszedzie lightness val i low_saturation_value przez 255 bo uzywam L jako sredniej znormalizownych max rgb i min rgb, czyli wczesniej podzielonych przez 255 
                 else if ((L > low_desaturation_value/255.0) && (L < lightness_val/255.0)) {
-                    is_partial = true;
+                    //is_partial = true;
                     //tutaj dla jasnosci wyznaczamy factor:
                     int diff = L*255 - low_desaturation_value; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
                     factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa saturacja
+                    
                 }
+                S = S * factor;
                
             }
             // Apply grayscale - haha grayscale to nie desaturacja 8=======D
-            if (is_partial) {
+            //tutaj w zasadzie obliczamy nowe R,G,B a na koncu je przypisujemy
+            if (S!=0) {
                 //desaturation = calculate_partial_gray(low_desaturation_value, high_desaturation_value, r, g, b);
-                S = S * factor;
+                //S = S * factor;
                 double q = 0;
                 double p = 0; //jakies fancy parameters do hsl->rgb conversion idk
                 if (L <= 0.5)
-                {
                     q = L * (1 + S);
-                }
                 else
-                {
                     q = L + S - L * S;
-                }
+               
                 p = 2 * L - q;
 
                 auto h = [](double t, double p_, double q_) {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
                     if (6 * t < 1)
-                        return q_;
-                    else if (6 * t < 2)
                         return p_ + (q_ - p_) * 6 * t;
-                    else if (2 * t < 3)
+                    if (2 * t < 1)
                         return q_;
-                    else if (3 * t < 4)
+                    if (3 * t < 2)
                         return p_ + (q_ - p_) * (2 / 3.0 - t) * 6;
-                    else
-                        return p_;
+                    return p_;
                     };//nazwalem se t¹ lambde h bo mi tak pasowalo ~_~
                 //tu obliczamy nowe rgb:
-                R_ = h(H + 1 / 3.0, p, q);
-                G_ = h(H, p, q);
-                B_ = h(H - 1 / 3.0, p, q);
+                R_ = h(H/360.0 + 1 / 3.0, p, q);
+                G_ = h(H/360.0, p, q);
+                B_ = h(H/360.0 - 1 / 3.0, p, q);
                 R_ = R_ * 255;
                 G_ = G_ * 255;
                 B_ = B_ * 255; //przeskalowanie, bo wczesniej normalizowalismy rgb
-                desaturation = cv::Vec3b(B_, G_, R_); //tutaj mamy wrzucona nowa saturacje naszego piksela w super kolejnosci bgr
+                //desaturation = cv::Vec3b(B_, G_, R_); //tutaj mamy wrzucona nowa saturacje naszego piksela w super kolejnosci bgr
             }
             else {
-                //int gray = (r + g + b) / 3;
-                //desaturation = cv::Vec3b(gray, gray, gray);
-
                 //jesli ma byc pelna desaturacja to S=0 i skladowe rgb po prostu s¹ wartoœci¹ L * 255
-                S = 0;
+                //S = 0;
                 R_ = G_ = B_ = L * 255;
-                desaturation = cv::Vec3b(B_, G_, R_);
+                //desaturation = cv::Vec3b(B_, G_, R_);
             
             }
            
-            desaturated.at<cv::Vec3b>(y, x) = desaturation;
+            desaturated.at<cv::Vec3b>(y, x)[0] = B_;
+            desaturated.at<cv::Vec3b>(y, x)[1] = G_;
+            desaturated.at<cv::Vec3b>(y, x)[2] = R_;
         }
     }
     //nie wiem szczerze co moge w tym temacie wiecej zmienicxD
