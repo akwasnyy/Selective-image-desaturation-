@@ -8,14 +8,7 @@
 #include <iostream>
 #include <algorithm>
 
-cv::Vec3b calculate_partial_gray(int low, int high, int r, int g, int b) {
-    int lightness = (r + g + b) / 3;
-    double factor = (lightness - low) / (high - low);
-    //factor = std::clamp(factor, 0.0, 1.0); // Ensure factor is within [0, 1]
-    int gray = (r + g + b) * factor / 3;
-    return cv::Vec3b(r * (1 - factor) + gray, g * (1 - factor) + gray, b * (1 - factor) + gray);
-    
-}
+
 class MyApp : public wxApp {
 public:
     virtual bool OnInit();
@@ -62,6 +55,7 @@ private:
     int partial_desaturation_value = 0;
     void desaturate();
     void UpdateSliders();
+    cv::Vec3b calculate_partial_gray(int r, int g, int b);
 };
 
 
@@ -104,6 +98,13 @@ bool MyApp::OnInit() {
     return true;
 }
 
+cv::Vec3b MyFrame::calculate_partial_gray(int r, int g, int b) {
+    
+    cv::Vec3b result(0, 0, 0);
+    return result;
+
+}
+
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     : wxFrame(NULL, wxID_ANY, title, pos, size), timer(this,ID_Timer) {
     wxMenu* menuFile = new wxMenu;
@@ -144,11 +145,11 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     b_txt = new wxStaticText(panel, wxID_ANY, "B=0", wxPoint(20,185));
 
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 285));
-    partial_desaturation_slider = new wxSlider(panel, ID_Partial, 0, 0, 100, wxPoint(20, 265), wxSize(300, -1), wxSL_HORIZONTAL);
-    new wxStaticText(panel, wxID_ANY, " 100 ", wxPoint(20, 285));
+    partial_desaturation_slider = new wxSlider(panel, ID_Partial, 0, 0, 100, wxPoint(20, 260), wxSize(300, -1), wxSL_HORIZONTAL);
+    new wxStaticText(panel, wxID_ANY, "100", wxPoint(310, 285));
     pd_txt = new wxStaticText(panel, wxID_ANY, "Partial Desaturation = 0", wxPoint(20, 245)); //poprawic ma byc od 0 do 100 %, gdzie 100% = lightness_value :)
     
-    wxString choices[] = { "Brightness", "RGB" };
+    wxString choices[] = { "Lightness", "RGB" };
     modeRadioBox = new wxRadioBox(panel, ID_Mode, "Mode", wxPoint(400, 20), wxDefaultSize, 2, choices, 1, wxRA_SPECIFY_COLS);
     modeRadioBox->SetSelection(0); // Default to Brightness mode
     
@@ -185,6 +186,8 @@ void MyFrame::OnSliderChange(wxCommandEvent& event) {
     G_val = gSlider->GetValue();
     B_val = bSlider->GetValue();
     partial_desaturation_value = partial_desaturation_slider->GetValue();
+
+
     //tutaj wrzucic logike
     lightness_txt->SetLabel(wxString::Format("Lightness=%d", lightness_val));
     r_txt->SetLabel(wxString::Format("R=%d", R_val));
@@ -246,8 +249,8 @@ void MyFrame::desaturate()
     desaturated = original.clone();
     int mode = selection; //mode dla cb kwasny ~ oki:>>
     cv::Vec3b desaturation;
-    int low_desaturation_value;
-    int high_desaturation_value;
+    int low_desaturation_value = std::max(0, lightness_val - partial_desaturation_value);
+
     for (int y = 0; y < desaturated.rows; ++y) {
         for (int x = 0; x < desaturated.cols; ++x) {
             bool is_partial = false;
@@ -255,49 +258,114 @@ void MyFrame::desaturate()
             int b = intensity[0];
             int g = intensity[1];
             int r = intensity[2];
+            //tutaj zamieniam rgb na hsl bo tak:
+            double B_ = b / 255.0;
+            double G_ = g / 255.0;
+            double R_ = r / 255.0;
 
+            double max_rgb = std::max({ R_, G_, B_ });
+            double min_rgb = std::min({ R_, G_, B_ });
+            double L =(max_rgb + min_rgb) / 2.0;
+            
+            double delta = max_rgb - min_rgb;
+            double S = 0;
+            
+            if (L <= 0.5)
+            {
+                S = delta / (max_rgb + min_rgb);
+            }
+            else
+            {
+                S = delta / (2.0 - max_rgb - min_rgb);
+            }
+            double H = 0;
+            if (delta != 0)
+            {
+                if (max_rgb == R_)
+                    H = (G_ - B_) / delta;
+                else if (max_rgb == G_)
+                    H = 2.0 + (B_ - R_) / delta;
+                else
+                    H = 4.0 + (R_ - G_) / delta;
+            }
+            H = H * 60;
+            if (H < 0)
+                H += 360;
+            //tutaj skonczylem zamieniac rgb na hsl
+            double factor = 1; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia
+            cv::Vec3b HSL_color(H, S, L);
             if (mode == 1) { // RGB mode
-                double factor = partial_desaturation_value / 100.0; 
-                high_desaturation_value = (R_val + G_val + B_val) / 3;
-                low_desaturation_value = high_desaturation_value * factor;
-
+                //tu na razie skip x d               
+              
                 if ((r > R_val || g > G_val || b > B_val)) {
                     continue; 
                 }
-                else if ((r >= R_val * factor && r <= R_val) &&
-                    (g >= G_val * factor && g <= G_val) &&
-                    (b >= B_val * factor && b <= B_val)) {
-                    
-                    
-                }
+
             }
             else if (mode == 0) {  // lightness mode
-                int lightness = (r + g + b) / 3;
-                low_desaturation_value = lightness_val - lightness_val * partial_desaturation_value / 100;
-                high_desaturation_value = lightness_val;
-                if (lightness > lightness_val) {
-     
-                    continue;
-                }
-                else if ((lightness > low_desaturation_value) && (lightness < lightness_val)) {
+                
+                if (L > lightness_val / 255.0)
+                    continue; //dziele tu wszedzie lightness val i low_saturation_value przez 255 bo uzywam L jako sredniej znormalizownych max rgb i min rgb, czyli wczesniej podzielonych przez 255 
+                else if ((L > low_desaturation_value/255.0) && (L < lightness_val/255.0)) {
                     is_partial = true;
+                    //tutaj dla jasnosci wyznaczamy factor:
+                    int diff = L*255 - low_desaturation_value; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
+                    factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa saturacja
                 }
                
             }
-            // Apply grayscale
+            // Apply grayscale - haha grayscale to nie desaturacja 8=======D
             if (is_partial) {
-                desaturation = calculate_partial_gray(std::max(0, low_desaturation_value), high_desaturation_value, r, g, b);
+                //desaturation = calculate_partial_gray(low_desaturation_value, high_desaturation_value, r, g, b);
+                S = S * factor;
+                double q = 0;
+                double p = 0; //jakies fancy parameters do hsl->rgb conversion idk
+                if (L <= 0.5)
+                {
+                    q = L * (1 + S);
+                }
+                else
+                {
+                    q = L + S - L * S;
+                }
+                p = 2 * L - q;
+
+                auto h = [](double t, double p_, double q_) {
+                    if (6 * t < 1)
+                        return q_;
+                    else if (6 * t < 2)
+                        return p_ + (q_ - p_) * 6 * t;
+                    else if (2 * t < 3)
+                        return q_;
+                    else if (3 * t < 4)
+                        return p_ + (q_ - p_) * (2 / 3.0 - t) * 6;
+                    else
+                        return p_;
+                    };//nazwalem se t¹ lambde h bo mi tak pasowalo ~_~
+                //tu obliczamy nowe rgb:
+                R_ = h(H + 1 / 3.0, p, q);
+                G_ = h(H, p, q);
+                B_ = h(H - 1 / 3.0, p, q);
+                R_ = R_ * 255;
+                G_ = G_ * 255;
+                B_ = B_ * 255; //przeskalowanie, bo wczesniej normalizowalismy rgb
+                desaturation = cv::Vec3b(B_, G_, R_); //tutaj mamy wrzucona nowa saturacje naszego piksela w super kolejnosci bgr
             }
             else {
-                int gray = (r + g + b) / 3;
-                desaturation = cv::Vec3b(gray, gray, gray);
+                //int gray = (r + g + b) / 3;
+                //desaturation = cv::Vec3b(gray, gray, gray);
+
+                //jesli ma byc pelna desaturacja to S=0 i skladowe rgb po prostu s¹ wartoœci¹ L * 255
+                S = 0;
+                R_ = G_ = B_ = L * 255;
+                desaturation = cv::Vec3b(B_, G_, R_);
+            
             }
            
-            
             desaturated.at<cv::Vec3b>(y, x) = desaturation;
         }
     }
-
+    //nie wiem szczerze co moge w tym temacie wiecej zmienicxD
    
 }
 
