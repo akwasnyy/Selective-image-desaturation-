@@ -5,7 +5,17 @@
 #include <wx/image.h>
 #include <wx/radiobox.h>
 #include <wx/slider.h>
-#include <thread>
+#include <iostream>
+#include <algorithm>
+
+cv::Vec3b calculate_partial_gray(int low, int high, int r, int g, int b) {
+    int lightness = (r + g + b) / 3;
+    double factor = (lightness - low) / (high - low);
+    //factor = std::clamp(factor, 0.0, 1.0); // Ensure factor is within [0, 1]
+    int gray = (r + g + b) * factor / 3;
+    return cv::Vec3b(r * (1 - factor) + gray, g * (1 - factor) + gray, b * (1 - factor) + gray);
+    
+}
 class MyApp : public wxApp {
 public:
     virtual bool OnInit();
@@ -28,26 +38,28 @@ private:
     
     wxTimer timer;
 
-    wxSlider* brightnessSlider;
+    wxSlider* lightnessSlider;
     wxSlider* rSlider;
     wxSlider* gSlider;
     wxSlider* bSlider;
     wxRadioBox* modeRadioBox;
+    wxSlider* partial_desaturation_slider;
 
     cv::Mat original;
     cv::Mat desaturated;
 
-    wxStaticText* brightness_txt;
+    wxStaticText* lightness_txt;
     wxStaticText* r_txt;
     wxStaticText* g_txt;
     wxStaticText* b_txt;
+    wxStaticText* pd_txt;
 
-    int brightness_val=0;
+    int lightness_val=0;
     int R_val=0;
     int G_val=0;
     int B_val=0;
     int selection = 0;
-
+    int partial_desaturation_value = 0;
     void desaturate();
     void UpdateSliders();
 };
@@ -57,12 +69,13 @@ private:
 enum {
     ID_Open = 1,
     ID_Save,
-    ID_Brightness=100,
+    ID_Lightness=100,
     ID_R,
     ID_G,
     ID_B,
     ID_Timer,
-    ID_Mode
+    ID_Mode,
+    ID_Partial
     
 };
 
@@ -71,10 +84,11 @@ EVT_MENU(ID_Open, MyFrame::OnOpen)
 EVT_MENU(ID_Save, MyFrame::OnSave)
 EVT_MENU(wxID_EXIT, MyFrame::OnExit)
 EVT_MENU(wxID_ABOUT, MyFrame::OnAbout)
-EVT_SLIDER(ID_Brightness, MyFrame::OnSliderChange)
+EVT_SLIDER(ID_Lightness, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_R, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_G, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_B, MyFrame::OnSliderChange)
+EVT_SLIDER(ID_Partial, MyFrame::OnSliderChange)
 EVT_TIMER(ID_Timer, MyFrame::OnUpdate)
 EVT_RADIOBOX(ID_Mode, MyFrame::OnModeChange)
 wxEND_EVENT_TABLE()
@@ -110,9 +124,9 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     wxPanel* panel = new wxPanel(this, wxID_ANY);
 
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 45));
-    brightnessSlider = new wxSlider(panel, ID_Brightness, 0, 0, 255, wxPoint(20, 20), wxSize(300, -1), wxSL_HORIZONTAL);
+    lightnessSlider = new wxSlider(panel, ID_Lightness, 0, 0, 255, wxPoint(20, 20), wxSize(300, -1), wxSL_HORIZONTAL);
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 45));
-    brightness_txt= new wxStaticText(panel, wxID_ANY, "Brightness=0", wxPoint(20,5));
+    lightness_txt = new wxStaticText(panel, wxID_ANY, "Lightness=0", wxPoint(20,5));
 
     new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 105));
     rSlider = new wxSlider(panel, ID_R, 0, 0, 255, wxPoint(20, 80), wxSize(300, -1), wxSL_HORIZONTAL);
@@ -129,6 +143,11 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 225));
     b_txt = new wxStaticText(panel, wxID_ANY, "B=0", wxPoint(20,185));
 
+    new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 285));
+    partial_desaturation_slider = new wxSlider(panel, ID_Partial, 0, 0, 100, wxPoint(20, 265), wxSize(300, -1), wxSL_HORIZONTAL);
+    new wxStaticText(panel, wxID_ANY, " 100 ", wxPoint(20, 285));
+    pd_txt = new wxStaticText(panel, wxID_ANY, "Partial Desaturation = 0", wxPoint(20, 245)); //poprawic ma byc od 0 do 100 %, gdzie 100% = lightness_value :)
+    
     wxString choices[] = { "Brightness", "RGB" };
     modeRadioBox = new wxRadioBox(panel, ID_Mode, "Mode", wxPoint(400, 20), wxDefaultSize, 2, choices, 1, wxRA_SPECIFY_COLS);
     modeRadioBox->SetSelection(0); // Default to Brightness mode
@@ -152,28 +171,26 @@ void MyFrame::OnUpdate(wxTimerEvent& event)
     }
 
     if (!original.empty() && !desaturated.empty()) {
-            
-
-            desaturate();
-            cv::imshow("Original image", original);
-            cv::imshow("Desaturated image", desaturated);
-           
+        desaturate();
+        cv::imshow("Original image", original);
+        cv::imshow("Desaturated image", desaturated);
     }
 
 }
 
 
 void MyFrame::OnSliderChange(wxCommandEvent& event) {
-    brightness_val = brightnessSlider->GetValue();
+    lightness_val = lightnessSlider->GetValue();
     R_val = rSlider->GetValue();
     G_val = gSlider->GetValue();
     B_val = bSlider->GetValue();
+    partial_desaturation_value = partial_desaturation_slider->GetValue();
     //tutaj wrzucic logike
-    brightness_txt->SetLabel(wxString::Format("Brightness=%d", brightness_val));
+    lightness_txt->SetLabel(wxString::Format("Lightness=%d", lightness_val));
     r_txt->SetLabel(wxString::Format("R=%d", R_val));
     g_txt->SetLabel(wxString::Format("G=%d", G_val));
     b_txt->SetLabel(wxString::Format("B=%d", B_val));
-
+    pd_txt->SetLabel(wxString::Format("Partial Desaturation = %d", partial_desaturation_value));
    
 }
 
@@ -227,28 +244,57 @@ void MyFrame::OnSave(wxCommandEvent& event) {
 void MyFrame::desaturate()
 {
     desaturated = original.clone();
-    int mode = selection; //mode dla cb kwasny
+    int mode = selection; //mode dla cb kwasny ~ oki:>>
+    cv::Vec3b desaturation;
+    int low_desaturation_value;
+    int high_desaturation_value;
     for (int y = 0; y < desaturated.rows; ++y) {
         for (int x = 0; x < desaturated.cols; ++x) {
+            bool is_partial = false;
             cv::Vec3b intensity = desaturated.at<cv::Vec3b>(y, x);
             int b = intensity[0];
             int g = intensity[1];
             int r = intensity[2];
 
-            if (mode == 1) {  // RGB mode
-                if (r > R_val || g > G_val || b > B_val) {
-                    continue;
+            if (mode == 1) { // RGB mode
+                double factor = partial_desaturation_value / 100.0; 
+                high_desaturation_value = (R_val + G_val + B_val) / 3;
+                low_desaturation_value = high_desaturation_value * factor;
+
+                if ((r > R_val || g > G_val || b > B_val)) {
+                    continue; 
+                }
+                else if ((r >= R_val * factor && r <= R_val) &&
+                    (g >= G_val * factor && g <= G_val) &&
+                    (b >= B_val * factor && b <= B_val)) {
+                    
+                    
                 }
             }
-            else if (mode == 0) {  // Brightness mode
-                int brightness = (r + g + b) / 3;
-                if (brightness > brightness_val) {
+            else if (mode == 0) {  // lightness mode
+                int lightness = (r + g + b) / 3;
+                low_desaturation_value = lightness_val - lightness_val * partial_desaturation_value / 100;
+                high_desaturation_value = lightness_val;
+                if (lightness > lightness_val) {
+     
                     continue;
                 }
+                else if ((lightness > low_desaturation_value) && (lightness < lightness_val)) {
+                    is_partial = true;
+                }
+               
             }
             // Apply grayscale
-            int gray = (r + g + b) / 3;
-            desaturated.at<cv::Vec3b>(y, x) = cv::Vec3b(gray, gray, gray);
+            if (is_partial) {
+                desaturation = calculate_partial_gray(std::max(0, low_desaturation_value), high_desaturation_value, r, g, b);
+            }
+            else {
+                int gray = (r + g + b) / 3;
+                desaturation = cv::Vec3b(gray, gray, gray);
+            }
+           
+            
+            desaturated.at<cv::Vec3b>(y, x) = desaturation;
         }
     }
 
@@ -266,8 +312,8 @@ MyFrame::~MyFrame() {
 void MyFrame::UpdateSliders() {
     selection = modeRadioBox->GetSelection();
     if (selection == 0) { // Brightness mode
-        brightnessSlider->Enable();
-        brightness_txt->Enable();
+        lightnessSlider->Enable();
+        lightness_txt->Enable();
 
         rSlider->Disable();
         r_txt->Disable();
@@ -277,8 +323,8 @@ void MyFrame::UpdateSliders() {
         b_txt->Disable();
     }
     else { // RGB mode
-        brightnessSlider->Disable();
-        brightness_txt->Disable();
+        lightnessSlider->Disable();
+        lightness_txt->Disable();
 
         rSlider->Enable();
         r_txt->Enable();
