@@ -280,7 +280,7 @@ void MyFrame::desaturate()
     int rows = desaturated.rows;
     int cols = desaturated.cols;
 
-    double lightness_low = std::max(0, lightness_val - partial_desaturation_value)/255.0;
+    int lightness_low = std::max(0, lightness_val - partial_desaturation_value);
 
     int c_low = C_val - partial_desaturation_value;
     int m_low = M_val - partial_desaturation_value;
@@ -290,7 +290,6 @@ void MyFrame::desaturate()
     int g_low = G_val - partial_desaturation_value;
     int b_low = B_val - partial_desaturation_value;//haha blow jak blow-ek haha wiecie ten jutuber ;~~D
     
-    double lightness_thresh = lightness_val / 255.0;
     for (int y = 0; y < rows; ++y) {
         for (int x = 0; x < cols; ++x) {
 
@@ -329,10 +328,10 @@ void MyFrame::desaturate()
             }
             else if (selection == 0) {  // lightness mode
                 
-                if (L > lightness_thresh)
+                if (L > lightness_val / 255.0)
                     continue; //dziele tu wszedzie lightness val i low_saturation_value przez 255 bo uzywam L jako sredniej znormalizownych max rgb i min rgb, czyli wczesniej podzielonych przez 255 
                 
-                if (L > (lightness_low) && (L<lightness_thresh)) {
+                if (L > (lightness_low / 255.0) && (L<lightness_val/255.0)) {
                     //tutaj dla jasnosci wyznaczamy factor:
                     int diff = L * 255 - lightness_low; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
                     factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa 
