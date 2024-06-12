@@ -66,8 +66,8 @@ private:
     int partial_desaturation_value = 0;
     void desaturate();
     void UpdateSliders();
-    double Calculate_Color_Factor(double rc, double gm, double by, int rc_low, int gm_low, int by_low);
-    cv::Vec3b calculate_partial_gray(int r, int g, int b);
+    double Calculate_Color_Factor(const double& rc, const double& gm, const double& by, const int& rc_low, const int& gm_low, const int& by_low) const;
+   
 };
 
 
@@ -111,17 +111,12 @@ wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit() {
     wxInitAllImageHandlers(); // Inicjalizacja obs³ugi ró¿nych formatów obrazów
-    MyFrame* frame = new MyFrame("Selective Image Desaturation", wxPoint(50, 50), wxSize(600, 400));
+    MyFrame* frame = new MyFrame("Selective Image Desaturation", wxPoint(50, 50), wxSize(600, 600));
     frame->Show(true);
     return true;
 }
 
-cv::Vec3b MyFrame::calculate_partial_gray(int r, int g, int b) {
 
-    cv::Vec3b result(0, 0, 0);
-    return result;
-
-}
 
 MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     : wxFrame(NULL, wxID_ANY, title, pos, size), timer(this, ID_Timer) {
@@ -209,7 +204,6 @@ void MyFrame::OnUpdate(wxTimerEvent& event)
         cv::imshow("Original image", original);
         cv::imshow("Desaturated image", desaturated);
     }
-
 }
 
 
@@ -283,10 +277,6 @@ void MyFrame::OnSave(wxCommandEvent& event) {
 void MyFrame::desaturate()
 {
     desaturated = original.clone();
-    int mode = selection; //mode dla cb kwasny ~ oki:>>
-
-    int low_desaturation_value = std::max(0, lightness_val - partial_desaturation_value);
-
     for (int y = 0; y < desaturated.rows; ++y) {
         for (int x = 0; x < desaturated.cols; ++x) {
 
@@ -299,19 +289,14 @@ void MyFrame::desaturate()
             double G_ = g / 255.0;
             double R_ = r / 255.0;
 
-            double max_rgb = std::max({ R_, G_, B_ });
-            double min_rgb = std::min({ R_, G_, B_ });
-            double H = 0;
-            double S = 0;
-            double L = (max_rgb + min_rgb) / 2.0;
+            double factor = 0; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia, domyslnie zero wtedy bedzie calkowita desaturacja
 
-            double delta = max_rgb - min_rgb;
+            cv::Vec3b HSL_color = RGB_TO_HSL(R_, G_,B_);
+            double H = HSL_color[0];
+            double S = HSL_color[1];
+            double L = HSL_color[2];
 
-            double factor = 0; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia
-
-            cv::Vec3b HSL_color = RGB_TO_HSL(r, g, b, H, S, L);
-
-            if (mode == 2)//CMY mode
+            if (selection == 2)//CMY mode
             {
                 double cyan = (1 - R_) * 255;
                 double magenta = (1 - G_) * 255;
@@ -325,57 +310,37 @@ void MyFrame::desaturate()
                 int y_low = Y_val - partial_desaturation_value;
 
                 if (cyan > c_low || magenta > m_low || yellow > y_low)
-                {
                     factor = Calculate_Color_Factor(cyan, magenta, yellow, c_low, m_low, y_low);
-                }
-                S = S * factor;
             }
-            else if (mode == 1) { // RGB mode             
-
-                if ((r > R_val || g > G_val || b > B_val)) {
+            else if (selection == 1) { // RGB mode             
+                if ((r > R_val || g > G_val || b > B_val)) 
                     continue;
-                }
+                
                 int r_low = R_val - partial_desaturation_value;
                 int g_low = G_val - partial_desaturation_value;
                 int b_low = B_val - partial_desaturation_value;//haha blow jak blow-ek haha wiecie ten jutuber ;~~D
 
                 if (r > r_low || g > g_low || b > b_low)
-                {
                     factor = Calculate_Color_Factor(r, g, b, r_low, g_low, b_low);
-                }
-
-
-                S = S * factor;
-
-
             }
-            else if (mode == 0) {  // lightness mode
-
+            else if (selection == 0) {  // lightness mode
+                
                 if (L > lightness_val / 255.0)
                     continue; //dziele tu wszedzie lightness val i low_saturation_value przez 255 bo uzywam L jako sredniej znormalizownych max rgb i min rgb, czyli wczesniej podzielonych przez 255 
-                else if ((L > low_desaturation_value / 255.0) && (L < lightness_val / 255.0)) {
-
+                int low_desaturation_value = std::max(0, lightness_val - partial_desaturation_value);
+                if (L > (low_desaturation_value / 255.0) && (L<lightness_val/255.0)) {
                     //tutaj dla jasnosci wyznaczamy factor:
                     int diff = L * 255 - low_desaturation_value; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
-                    factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa saturacja
-
+                    factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa 
                 }
-                S = S * factor;
-
             }
+            S = S * factor;
             // Apply grayscale - haha grayscale to nie desaturacja 8=======D
             //tutaj w zasadzie obliczamy nowe R,G,B a na koncu je przypisujemy
-            if (S != 0) {
-
-                S = S * factor;
-                HSL_TO_RGB(R_, B_, G_, H, S, L);
-
-            }
-            else {
-                //jesli ma byc pelna desaturacja to S=0 i skladowe rgb po prostu s¹ warto?ci¹ L * 
-                R_ = G_ = B_ = L * 255;
-
-            }
+            if (S != 0)
+                HSL_TO_RGB(R_, G_, B_, H, S, L);//czesciowa desaturacja poprzez zmiane wartosci wspolczynnika S i obliczenie rgb na nowo
+            else
+                R_ = G_ = B_ = L * 255; //calkowita desaturacja
 
             desaturated.at<cv::Vec3b>(y, x)[0] = B_;
             desaturated.at<cv::Vec3b>(y, x)[1] = G_;
@@ -451,14 +416,14 @@ void MyFrame::UpdateSliders() {
         y_txt->Enable();
     }
 }
-double MyFrame::Calculate_Color_Factor(double rc, double gm, double by, int rc_low, int gm_low, int by_low) {
+double MyFrame::Calculate_Color_Factor  (const double& rc, const double& gm, const double& by, const int& rc_low, const int& gm_low, const int& by_low) const {
     double diff_rc = (rc - rc_low) > 0 ? rc - rc_low : 0;
-    double diff_bm = (gm - gm_low) > 0 ? gm - gm_low : 0;
-    double diff_gy = (by - by_low) > 0 ? by - by_low : 0;
+    double diff_gm = (gm - gm_low) > 0 ? gm - gm_low : 0;
+    double diff_by = (by - by_low) > 0 ? by - by_low : 0;
 
     double factor_rc = diff_rc / static_cast<double>(partial_desaturation_value);
-    double factor_bm = diff_bm / static_cast<double>(partial_desaturation_value);
-    double factor_gy = diff_gy / static_cast <double> (partial_desaturation_value);
+    double factor_gm = diff_gm / static_cast<double>(partial_desaturation_value);
+    double factor_by = diff_by / static_cast <double> (partial_desaturation_value);
 
-    return std::max({ factor_rc,factor_bm,factor_gy });
+    return std::max({ factor_rc,factor_gm,factor_by });
 }

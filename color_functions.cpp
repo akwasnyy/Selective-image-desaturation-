@@ -1,16 +1,13 @@
 #include "color_functions.h"
 using namespace cv;
 
-Vec3b RGB_TO_HSL(int& r, int& b, int& g, double& H, double& S, double& L) {
-    double B_ = b / 255.0;
-    double G_ = g / 255.0;
-    double R_ = r / 255.0;
+Vec3b RGB_TO_HSL(const double& R_, const double& G_, const double& B_)   {
     double max_rgb = std::max({ R_, G_, B_ });
     double min_rgb = std::min({ R_, G_, B_ });
-    L = (max_rgb + min_rgb) / 2.0;
+    double L = (max_rgb + min_rgb) / 2.0;
 
     double delta = max_rgb - min_rgb;
-    S = 0;
+    double S = 0;
 
     if (L <= 0.5)
     {
@@ -20,7 +17,7 @@ Vec3b RGB_TO_HSL(int& r, int& b, int& g, double& H, double& S, double& L) {
     {
         S = delta / (2.0 - max_rgb - min_rgb);
     }
-    H = 0;
+    double H = 0;
     if (delta != 0)
     {
         if (max_rgb == R_)
@@ -38,7 +35,7 @@ Vec3b RGB_TO_HSL(int& r, int& b, int& g, double& H, double& S, double& L) {
 }
 
 
-void HSL_TO_RGB(double& R_, double& B_, double& G_, double& H, double& S, double& L) {
+void HSL_TO_RGB(double& R_, double& G_, double& B_, const double& H, const double& S, const double& L) {
     double q = 0;
     double p = 0; //jakies fancy parameters do hsl->rgb conversion idk
     if (L <= 0.5)
@@ -63,9 +60,9 @@ void HSL_TO_RGB(double& R_, double& B_, double& G_, double& H, double& S, double
     R_ = h(H / 360.0 + 1 / 3.0, p, q);
     G_ = h(H / 360.0, p, q);
     B_ = h(H / 360.0 - 1 / 3.0, p, q);
-    R_ = R_ * 255;
-    G_ = G_ * 255;
-    B_ = B_ * 255; //przeskalowanie, bo wczesniej normalizowalismy 
+    R_ = R_ * 255.0;
+    G_ = G_ * 255.0;
+    B_ = B_ * 255.0; //przeskalowanie, bo wczesniej normalizowalismy 
 
 }
 
