@@ -1,13 +1,12 @@
 #include "color_functions.h"
 using namespace cv;
 
-Vec3b RGB_TO_HSL(const double& R_, const double& G_, const double& B_)   {
+void RGB_TO_HSL(const double& R_, const double& G_, const double& B_, double& H, double& S, double& L)   {
     double max_rgb = std::max({ R_, G_, B_ });
     double min_rgb = std::min({ R_, G_, B_ });
-    double L = (max_rgb + min_rgb) / 2.0;
-
+    L = (max_rgb + min_rgb) / 2.0;
+    H = 0; S = 0;
     double delta = max_rgb - min_rgb;
-    double S = 0;
 
     if (L <= 0.5)
     {
@@ -17,7 +16,7 @@ Vec3b RGB_TO_HSL(const double& R_, const double& G_, const double& B_)   {
     {
         S = delta / (2.0 - max_rgb - min_rgb);
     }
-    double H = 0;
+    
     if (delta != 0)
     {
         if (max_rgb == R_)
@@ -30,8 +29,6 @@ Vec3b RGB_TO_HSL(const double& R_, const double& G_, const double& B_)   {
     H = H * 60;
     if (H < 0)
         H += 360;
-
-    return Vec3b(H, S, L);
 }
 
 

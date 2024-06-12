@@ -290,12 +290,10 @@ void MyFrame::desaturate()
             double R_ = r / 255.0;
 
             double factor = 0; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia, domyslnie zero wtedy bedzie calkowita desaturacja
-
-            cv::Vec3b HSL_color = RGB_TO_HSL(R_, G_,B_);
-            double H = HSL_color[0];
-            double S = HSL_color[1];
-            double L = HSL_color[2];
-
+            double H, S, L;
+            
+            RGB_TO_HSL(R_, G_,B_,H,S,L);
+            
             if (selection == 2)//CMY mode
             {
                 double cyan = (1 - R_) * 255;
