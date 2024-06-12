@@ -252,7 +252,7 @@ void MyFrame::OnExit(wxCommandEvent& event) {
 }
 
 void MyFrame::OnAbout(wxCommandEvent& event) {
-    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the brightness or RGB threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.", "Get some help", wxOK | wxICON_INFORMATION);
+    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the brightness/RGB/CMY threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.\nYou can use the \"Partial desaturation\" slidebar to make the transition between grayscale and color smoothier.", "Get some help", wxOK | wxICON_INFORMATION);
 }
 
 void MyFrame::OnSave(wxCommandEvent& event) {
@@ -277,8 +277,22 @@ void MyFrame::OnSave(wxCommandEvent& event) {
 void MyFrame::desaturate()
 {
     desaturated = original.clone();
-    for (int y = 0; y < desaturated.rows; ++y) {
-        for (int x = 0; x < desaturated.cols; ++x) {
+    int rows = desaturated.rows;
+    int cols = desaturated.cols;
+
+    double lightness_low = std::max(0, lightness_val - partial_desaturation_value)/255.0;
+
+    int c_low = C_val - partial_desaturation_value;
+    int m_low = M_val - partial_desaturation_value;
+    int y_low = Y_val - partial_desaturation_value;
+
+    int r_low = R_val - partial_desaturation_value;
+    int g_low = G_val - partial_desaturation_value;
+    int b_low = B_val - partial_desaturation_value;//haha blow jak blow-ek haha wiecie ten jutuber ;~~D
+    
+    double lightness_thresh = lightness_val / 255.0;
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
 
             cv::Vec3b& intensity = desaturated.at<cv::Vec3b>(y, x);
             int b = intensity[0];
@@ -303,32 +317,24 @@ void MyFrame::desaturate()
                 if (cyan > C_val || magenta > M_val || yellow > Y_val)
                     continue;
 
-                int c_low = C_val - partial_desaturation_value;
-                int m_low = M_val - partial_desaturation_value;
-                int y_low = Y_val - partial_desaturation_value;
-
                 if (cyan > c_low || magenta > m_low || yellow > y_low)
                     factor = Calculate_Color_Factor(cyan, magenta, yellow, c_low, m_low, y_low);
             }
             else if (selection == 1) { // RGB mode             
                 if ((r > R_val || g > G_val || b > B_val)) 
                     continue;
-                
-                int r_low = R_val - partial_desaturation_value;
-                int g_low = G_val - partial_desaturation_value;
-                int b_low = B_val - partial_desaturation_value;//haha blow jak blow-ek haha wiecie ten jutuber ;~~D
 
                 if (r > r_low || g > g_low || b > b_low)
                     factor = Calculate_Color_Factor(r, g, b, r_low, g_low, b_low);
             }
             else if (selection == 0) {  // lightness mode
                 
-                if (L > lightness_val / 255.0)
+                if (L > lightness_thresh)
                     continue; //dziele tu wszedzie lightness val i low_saturation_value przez 255 bo uzywam L jako sredniej znormalizownych max rgb i min rgb, czyli wczesniej podzielonych przez 255 
-                int low_desaturation_value = std::max(0, lightness_val - partial_desaturation_value);
-                if (L > (low_desaturation_value / 255.0) && (L<lightness_val/255.0)) {
+                
+                if (L > (lightness_low) && (L<lightness_thresh)) {
                     //tutaj dla jasnosci wyznaczamy factor:
-                    int diff = L * 255 - low_desaturation_value; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
+                    int diff = L * 255 - lightness_low; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
                     factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa 
                 }
             }
