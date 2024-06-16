@@ -274,7 +274,7 @@ void MyFrame::OnExit(wxCommandEvent& event) {
 }
 
 void MyFrame::OnAbout(wxCommandEvent& event) {
-    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the Lightness/RGB/CMY threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.\nYou can use the \"Partial desaturation\" slidebar to make the transition between grayscale and color smoothier.", "Get some help", wxOK | wxICON_INFORMATION);
+    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the Lightness/RGB/CMY threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.\nFor the Hue threshold, you can also set the range - the pixels with hue value in the range (which is the distance from the Hue value of the first slider) will be desaturated.\nYou can use the \"Partial desaturation\" slidebar to make the transition between grayscale and color smoothier.", "Get some help", wxOK | wxICON_INFORMATION);
 }
 
 void MyFrame::OnSave(wxCommandEvent& event) {
