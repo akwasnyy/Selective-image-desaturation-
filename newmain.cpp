@@ -1,6 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
-//#include <opencv2/opencv.hpp>
-//#include <opencv2/highgui.hpp>
+
 #include <wx/wx.h>
 #include <wx/image.h>
 #include <wx/radiobox.h>
@@ -301,7 +300,7 @@ void MyFrame::desaturate()
     int g_low = G_val - partial_desaturation_value;
     int b_low = B_val - partial_desaturation_value;
     
-    int hue_low = hue_val - partial_desaturation_value;
+    double hue_low = hue_val - partial_desaturation_value;
     
     for (int y = 0; y < rows; ++y) {
         for (int x = 0; x < cols; ++x) {
@@ -326,7 +325,8 @@ void MyFrame::desaturate()
 
                 if (H > hue_low)
                 {
-                    factor = 
+                    double diff = H - hue_low;
+                    factor = diff / static_cast <double> (partial_desaturation_value);
                 }
 
             }
@@ -401,8 +401,8 @@ void MyFrame::UpdateSliders() {
         ySlider->Disable();
         y_txt->Disable();
 
-        hueSlider->Disable(); // Add this line
-        hue_txt->Disable();   // Add this line
+        hueSlider->Disable(); 
+        hue_txt->Disable();   
     }
     else if (selection == 1) { // RGB mode
         lightnessSlider->Disable();
@@ -422,8 +422,8 @@ void MyFrame::UpdateSliders() {
         ySlider->Disable();
         y_txt->Disable();
 
-        hueSlider->Disable(); // Add this line
-        hue_txt->Disable();   // Add this line
+        hueSlider->Disable(); 
+        hue_txt->Disable();   
     }
     else if (selection == 2) { // CMY mode
         lightnessSlider->Disable();
@@ -443,8 +443,8 @@ void MyFrame::UpdateSliders() {
         ySlider->Enable();
         y_txt->Enable();
 
-        hueSlider->Disable(); // Add this line
-        hue_txt->Disable();   // Add this line
+        hueSlider->Disable(); 
+        hue_txt->Disable();   
     }
     else if (selection == 3)//hue mode
     {
@@ -465,8 +465,8 @@ void MyFrame::UpdateSliders() {
         ySlider->Disable();
         y_txt->Disable();
 
-        hueSlider->Enable(); // Add this line
-        hue_txt->Enable();   // Add this line
+        hueSlider->Enable(); 
+        hue_txt->Enable();   
     }
 }
 double MyFrame::Calculate_Color_Factor  (const double& rc, const double& gm, const double& by, const int& rc_low, const int& gm_low, const int& by_low) const {
