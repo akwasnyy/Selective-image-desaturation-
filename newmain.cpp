@@ -320,14 +320,16 @@ void MyFrame::desaturate()
             RGB_TO_HSL(R_, G_,B_,H,S,L);
             if (selection == 3) // hue mode
             {
-                if (H > hue_val)
+                double hue_val_left = std::max(hue_val - 10, 0);
+                double hue_val_right = std::min(hue_val + 10, 360);
+                if (H < hue_val_left || H>hue_val_right)
                     continue;
 
-                if (H > hue_low)
-                {
-                    double diff = H - hue_low;
-                    factor = diff / static_cast <double> (partial_desaturation_value);
-                }
+               // if (H > hue_low)
+                //{
+                 //   double diff = H - hue_low;
+                  //  factor = diff / static_cast <double> (partial_desaturation_value);
+               // }
 
             }
             else if (selection == 2)//CMY mode
