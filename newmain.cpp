@@ -38,6 +38,7 @@ private:
     wxSlider* cSlider;
     wxSlider* mSlider;
     wxSlider* ySlider;
+    wxSlider* hueSlider;
     wxRadioBox* modeRadioBox;
     wxSlider* partial_desaturation_slider;
 
@@ -52,6 +53,7 @@ private:
     wxStaticText* m_txt;
     wxStaticText* y_txt;
     wxStaticText* pd_txt;
+    wxStaticText* hue_txt;
 
     int lightness_val = 0;
     int R_val = 0;
@@ -61,6 +63,8 @@ private:
     int C_val = 0;
     int M_val = 0;
     int Y_val = 0;
+    
+    int hue_val = 0;
 
     int selection = 0;
     int partial_desaturation_value = 0;
@@ -82,6 +86,7 @@ enum {
     ID_C,
     ID_M,
     ID_Y,
+    ID_Hue,
     ID_Timer,
     ID_Mode,
     ID_Partial
@@ -101,6 +106,7 @@ EVT_SLIDER(ID_C, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_M, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_Y, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_Partial, MyFrame::OnSliderChange)
+EVT_SLIDER(ID_Hue, MyFrame::OnSliderChange)
 EVT_TIMER(ID_Timer, MyFrame::OnUpdate)
 EVT_RADIOBOX(ID_Mode, MyFrame::OnModeChange)
 wxEND_EVENT_TABLE()
@@ -110,8 +116,8 @@ wxEND_EVENT_TABLE()
 wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit() {
-    wxInitAllImageHandlers(); // Inicjalizacja obs³ugi ró¿nych formatów obrazów
-    MyFrame* frame = new MyFrame("Selective Image Desaturation", wxPoint(50, 50), wxSize(600, 600));
+    wxInitAllImageHandlers(); 
+    MyFrame* frame = new MyFrame("Selective Image Desaturation", wxPoint(50, 50), wxSize(600, 700));
     frame->Show(true);
     return true;
 }
@@ -122,7 +128,7 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     : wxFrame(NULL, wxID_ANY, title, pos, size), timer(this, ID_Timer) {
     wxMenu* menuFile = new wxMenu;
     menuFile->Append(ID_Open, "&Open...\tCtrl-O", "Open an image file");
-    menuFile->Append(ID_Save, "&Save...\tCtrl-S", "Save the current image"); // Add Save option
+    menuFile->Append(ID_Save, "&Save...\tCtrl-S", "Save the current image"); 
     menuFile->AppendSeparator();
     menuFile->Append(wxID_EXIT);
 
@@ -172,20 +178,25 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     new wxStaticText(panel, wxID_ANY, "255", wxPoint(310, 405));
     y_txt = new wxStaticText(panel, wxID_ANY, "Y=0", wxPoint(20, 365));
 
-    new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 465));
-    partial_desaturation_slider = new wxSlider(panel, ID_Partial, 0, 0, 100, wxPoint(20, 440), wxSize(300, -1), wxSL_HORIZONTAL);
-    new wxStaticText(panel, wxID_ANY, "100", wxPoint(310, 465));
-    pd_txt = new wxStaticText(panel, wxID_ANY, "Partial Desaturation = 0", wxPoint(20, 425));
+    new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 525));
+    partial_desaturation_slider = new wxSlider(panel, ID_Partial, 0, 0, 100, wxPoint(20, 500), wxSize(300, -1), wxSL_HORIZONTAL);
+    new wxStaticText(panel, wxID_ANY, "100", wxPoint(310, 525));
+    pd_txt = new wxStaticText(panel, wxID_ANY, "Partial Desaturation = 0", wxPoint(20, 485));
 
-    wxString choices[] = { "Lightness", "RGB", "CMY" };
-    modeRadioBox = new wxRadioBox(panel, ID_Mode, "Mode", wxPoint(400, 20), wxDefaultSize, 3, choices, 1, wxRA_SPECIFY_COLS);
-    modeRadioBox->SetSelection(0); // Default to Brightness mode
+    new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 465));
+    hueSlider = new wxSlider(panel, ID_Hue, 0, 0, 360, wxPoint(20, 440), wxSize(300, -1), wxSL_HORIZONTAL); 
+    new wxStaticText(panel, wxID_ANY, "360", wxPoint(310, 465)); 
+    hue_txt = new wxStaticText(panel, wxID_ANY, "Hue = 0", wxPoint(20, 425)); 
+
+    wxString choices[] = { "Lightness", "RGB", "CMY", "Hue"};
+    modeRadioBox = new wxRadioBox(panel, ID_Mode, "Mode", wxPoint(400, 20), wxDefaultSize, 4, choices, 1, wxRA_SPECIFY_COLS);
+    modeRadioBox->SetSelection(0); 
 
     CreateStatusBar();
-    SetStatusText("Selective Image Desaturation v0.2");
+    SetStatusText("Selective Image Desaturation v0.8");
 
     timer.Start(10);
-    UpdateSliders(); // Initialize slider states
+    UpdateSliders(); 
 
 }
 
@@ -216,6 +227,7 @@ void MyFrame::OnSliderChange(wxCommandEvent& event) {
     M_val = mSlider->GetValue();
     Y_val = ySlider->GetValue();
     partial_desaturation_value = partial_desaturation_slider->GetValue();
+    hue_val = hueSlider->GetValue(); 
 
     lightness_txt->SetLabel(wxString::Format("Lightness=%d", lightness_val));
     r_txt->SetLabel(wxString::Format("R=%d", R_val));
@@ -225,6 +237,7 @@ void MyFrame::OnSliderChange(wxCommandEvent& event) {
     m_txt->SetLabel(wxString::Format("M=%d", M_val));
     y_txt->SetLabel(wxString::Format("Y=%d", Y_val));
     pd_txt->SetLabel(wxString::Format("Partial Desaturation = %d", partial_desaturation_value));
+    hue_txt->SetLabel(wxString::Format("Hue=%d", hue_val)); 
 }
 
 void MyFrame::OnOpen(wxCommandEvent& event) {
@@ -234,12 +247,10 @@ void MyFrame::OnOpen(wxCommandEvent& event) {
     if (!filePath.empty()) {
         original = cv::imread(filePath.ToStdString(), cv::IMREAD_COLOR);
         desaturated = original.clone();
-        //zaimplementowac jakis display handler czy cos idk
+        
         if (!desaturated.empty()) {
-            cv::namedWindow("Original image", cv::WINDOW_NORMAL);  // Pierwsze okno
-            cv::namedWindow("Desaturated image", cv::WINDOW_NORMAL);  // Drugie okno
-
-
+            cv::namedWindow("Original image", cv::WINDOW_NORMAL);
+            cv::namedWindow("Desaturated image", cv::WINDOW_NORMAL);
         }
         else {
             wxLogError("Cannot open or find the image.");
@@ -252,7 +263,7 @@ void MyFrame::OnExit(wxCommandEvent& event) {
 }
 
 void MyFrame::OnAbout(wxCommandEvent& event) {
-    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the brightness/RGB/CMY threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.\nYou can use the \"Partial desaturation\" slidebar to make the transition between grayscale and color smoothier.", "Get some help", wxOK | wxICON_INFORMATION);
+    wxMessageBox("Choose a file (.jpg) to open by clicking File->Open or pressing Ctrl+O on your keyboard.\nThen, set the Lightness/RGB/CMY threshold to desaturate those parts of the photo, which have pixels with values lower than the threshold.\nYou can use the \"Partial desaturation\" slidebar to make the transition between grayscale and color smoothier.", "Get some help", wxOK | wxICON_INFORMATION);
 }
 
 void MyFrame::OnSave(wxCommandEvent& event) {
@@ -288,7 +299,9 @@ void MyFrame::desaturate()
 
     int r_low = R_val - partial_desaturation_value;
     int g_low = G_val - partial_desaturation_value;
-    int b_low = B_val - partial_desaturation_value;//haha blow jak blow-ek haha wiecie ten jutuber ;~~D
+    int b_low = B_val - partial_desaturation_value;
+    
+    int hue_low = hue_val - partial_desaturation_value;
     
     for (int y = 0; y < rows; ++y) {
         for (int x = 0; x < cols; ++x) {
@@ -302,12 +315,22 @@ void MyFrame::desaturate()
             double G_ = g / 255.0;
             double R_ = r / 255.0;
 
-            double factor = 0; //wspolczynnik zmiany desaturacji, na podstawie parametru rozmycia, domyslnie zero wtedy bedzie calkowita desaturacja
+            double factor = 0; //factor of desaturation, default is 0 -> complete desaturation 
             double H, S, L;
             
             RGB_TO_HSL(R_, G_,B_,H,S,L);
-            
-            if (selection == 2)//CMY mode
+            if (selection == 3) // hue mode
+            {
+                if (H > hue_val)
+                    continue;
+
+                if (H > hue_low)
+                {
+                    factor = 
+                }
+
+            }
+            else if (selection == 2)//CMY mode
             {
                 double cyan = (1 - R_) * 255;
                 double magenta = (1 - G_) * 255;
@@ -329,29 +352,25 @@ void MyFrame::desaturate()
             else if (selection == 0) {  // lightness mode
                 
                 if (L > lightness_val / 255.0)
-                    continue; //dziele tu wszedzie lightness val i low_saturation_value przez 255 bo uzywam L jako sredniej znormalizownych max rgb i min rgb, czyli wczesniej podzielonych przez 255 
+                    continue; 
                 
-                if (L > (lightness_low / 255.0) && (L<lightness_val/255.0)) {
-                    //tutaj dla jasnosci wyznaczamy factor:
-                    int diff = L * 255 - lightness_low; //tu se mnoze L przez 255 zeby sie matematyka zgadzala bo wczesniej L jest znormalizowane to tutaj se pomnoze ;-D
-                    factor = diff / static_cast<double> (partial_desaturation_value); //ten factor bedzie okreslal zmiane saturacji, tzn factor*S to nasza nowa 
+                if (L > (lightness_low / 255.0)) {
+                    int diff = L * 255 - lightness_low; 
+                    factor = diff / static_cast<double> (partial_desaturation_value); 
                 }
             }
             S = S * factor;
-            // Apply grayscale - haha grayscale to nie desaturacja 8=======D
-            //tutaj w zasadzie obliczamy nowe R,G,B a na koncu je przypisujemy
+            
             if (S != 0)
-                HSL_TO_RGB(R_, G_, B_, H, S, L);//czesciowa desaturacja poprzez zmiane wartosci wspolczynnika S i obliczenie rgb na nowo
+                HSL_TO_RGB(R_, G_, B_, H, S, L);
             else
-                R_ = G_ = B_ = L * 255; //calkowita desaturacja
+                R_ = G_ = B_ = L * 255; 
 
             desaturated.at<cv::Vec3b>(y, x)[0] = B_;
             desaturated.at<cv::Vec3b>(y, x)[1] = G_;
             desaturated.at<cv::Vec3b>(y, x)[2] = R_;
         }
     }
-    //nie wiem szczerze co moge w tym temacie wiecej zmienicxD
-
 }
 
 void MyFrame::OnModeChange(wxCommandEvent& event) {
@@ -364,7 +383,7 @@ MyFrame::~MyFrame() {
 
 void MyFrame::UpdateSliders() {
     selection = modeRadioBox->GetSelection();
-    if (selection == 0) { // Brightness mode
+    if (selection == 0) { // Lightness mode
         lightnessSlider->Enable();
         lightness_txt->Enable();
 
@@ -381,6 +400,9 @@ void MyFrame::UpdateSliders() {
         m_txt->Disable();
         ySlider->Disable();
         y_txt->Disable();
+
+        hueSlider->Disable(); // Add this line
+        hue_txt->Disable();   // Add this line
     }
     else if (selection == 1) { // RGB mode
         lightnessSlider->Disable();
@@ -399,6 +421,9 @@ void MyFrame::UpdateSliders() {
         m_txt->Disable();
         ySlider->Disable();
         y_txt->Disable();
+
+        hueSlider->Disable(); // Add this line
+        hue_txt->Disable();   // Add this line
     }
     else if (selection == 2) { // CMY mode
         lightnessSlider->Disable();
@@ -417,6 +442,31 @@ void MyFrame::UpdateSliders() {
         m_txt->Enable();
         ySlider->Enable();
         y_txt->Enable();
+
+        hueSlider->Disable(); // Add this line
+        hue_txt->Disable();   // Add this line
+    }
+    else if (selection == 3)//hue mode
+    {
+        lightnessSlider->Disable();
+        lightness_txt->Disable();
+
+        rSlider->Disable();
+        r_txt->Disable();
+        gSlider->Disable();
+        g_txt->Disable();
+        bSlider->Disable();
+        b_txt->Disable();
+
+        cSlider->Disable();
+        c_txt->Disable();
+        mSlider->Disable();
+        m_txt->Disable();
+        ySlider->Disable();
+        y_txt->Disable();
+
+        hueSlider->Enable(); // Add this line
+        hue_txt->Enable();   // Add this line
     }
 }
 double MyFrame::Calculate_Color_Factor  (const double& rc, const double& gm, const double& by, const int& rc_low, const int& gm_low, const int& by_low) const {
