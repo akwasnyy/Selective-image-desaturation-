@@ -38,6 +38,7 @@ private:
     wxSlider* mSlider;
     wxSlider* ySlider;
     wxSlider* hueSlider;
+    wxSlider* huerangeSlider;
     wxRadioBox* modeRadioBox;
     wxSlider* partial_desaturation_slider;
 
@@ -53,6 +54,7 @@ private:
     wxStaticText* y_txt;
     wxStaticText* pd_txt;
     wxStaticText* hue_txt;
+    wxStaticText* huerange_txt;
 
     int lightness_val = 0;
     int R_val = 0;
@@ -64,6 +66,7 @@ private:
     int Y_val = 0;
     
     int hue_val = 0;
+    int hue_range = 0;
 
     int selection = 0;
     int partial_desaturation_value = 0;
@@ -86,6 +89,7 @@ enum {
     ID_M,
     ID_Y,
     ID_Hue,
+    ID_Huerange,
     ID_Timer,
     ID_Mode,
     ID_Partial
@@ -106,6 +110,7 @@ EVT_SLIDER(ID_M, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_Y, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_Partial, MyFrame::OnSliderChange)
 EVT_SLIDER(ID_Hue, MyFrame::OnSliderChange)
+EVT_SLIDER(ID_Huerange, MyFrame::OnSliderChange)
 EVT_TIMER(ID_Timer, MyFrame::OnUpdate)
 EVT_RADIOBOX(ID_Mode, MyFrame::OnModeChange)
 wxEND_EVENT_TABLE()
@@ -187,12 +192,17 @@ MyFrame::MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
     new wxStaticText(panel, wxID_ANY, "360", wxPoint(310, 465)); 
     hue_txt = new wxStaticText(panel, wxID_ANY, "Hue = 0", wxPoint(20, 425)); 
 
+    new wxStaticText(panel, wxID_ANY, "0", wxPoint(20, 585));
+    huerangeSlider = new wxSlider(panel, ID_Huerange, 0, 0, 100, wxPoint(20, 560), wxSize(300, -1), wxSL_HORIZONTAL);
+    new wxStaticText(panel, wxID_ANY, "100", wxPoint(310, 585));
+    huerange_txt = new wxStaticText(panel, wxID_ANY, "Hue range = 0", wxPoint(20, 545));
+
     wxString choices[] = { "Lightness", "RGB", "CMY", "Hue"};
     modeRadioBox = new wxRadioBox(panel, ID_Mode, "Mode", wxPoint(400, 20), wxDefaultSize, 4, choices, 1, wxRA_SPECIFY_COLS);
     modeRadioBox->SetSelection(0); 
 
     CreateStatusBar();
-    SetStatusText("Selective Image Desaturation v0.8");
+    SetStatusText("Selective Image Desaturation v2.0");
 
     timer.Start(10);
     UpdateSliders(); 
@@ -225,6 +235,7 @@ void MyFrame::OnSliderChange(wxCommandEvent& event) {
     C_val = cSlider->GetValue();
     M_val = mSlider->GetValue();
     Y_val = ySlider->GetValue();
+    hue_range = huerangeSlider->GetValue();
     partial_desaturation_value = partial_desaturation_slider->GetValue();
     hue_val = hueSlider->GetValue(); 
 
@@ -237,6 +248,7 @@ void MyFrame::OnSliderChange(wxCommandEvent& event) {
     y_txt->SetLabel(wxString::Format("Y=%d", Y_val));
     pd_txt->SetLabel(wxString::Format("Partial Desaturation = %d", partial_desaturation_value));
     hue_txt->SetLabel(wxString::Format("Hue=%d", hue_val)); 
+    huerange_txt->SetLabel(wxString::Format("Hue range=%d", hue_range));
 }
 
 void MyFrame::OnOpen(wxCommandEvent& event) {
@@ -300,8 +312,11 @@ void MyFrame::desaturate()
     int g_low = G_val - partial_desaturation_value;
     int b_low = B_val - partial_desaturation_value;
     
-    double hue_low = hue_val - partial_desaturation_value;
-    
+    double hue_val_left = std::max(hue_val - hue_range, 0);
+    double hue_val_right = std::min(hue_val + hue_range, 360);
+    double hue_low = std::max(hue_val-hue_range-partial_desaturation_value,0);
+    double hue_high = std::min(hue_val + hue_range + partial_desaturation_value, 360);
+
     for (int y = 0; y < rows; ++y) {
         for (int x = 0; x < cols; ++x) {
 
@@ -320,16 +335,20 @@ void MyFrame::desaturate()
             RGB_TO_HSL(R_, G_,B_,H,S,L);
             if (selection == 3) // hue mode
             {
-                double hue_val_left = std::max(hue_val - 10, 0);
-                double hue_val_right = std::min(hue_val + 10, 360);
-                if (H < hue_val_left || H>hue_val_right)
-                    continue;
+                if (H <= hue_low || H>=hue_high)
+                     continue; //no desaturation
+                
+                if (H <= hue_val_left && H>=hue_low)
+                {
+                    double diff = hue_val_left - H;
+                    factor = diff / static_cast<double>(partial_desaturation_value);
+                }
+                else if (H >= hue_val_right && H <= hue_high)
+                {
+                    double diff = H - hue_val_right;
+                    factor = diff / static_cast<double>(partial_desaturation_value);
+                }
 
-               // if (H > hue_low)
-                //{
-                 //   double diff = H - hue_low;
-                  //  factor = diff / static_cast <double> (partial_desaturation_value);
-               // }
 
             }
             else if (selection == 2)//CMY mode
@@ -405,6 +424,9 @@ void MyFrame::UpdateSliders() {
 
         hueSlider->Disable(); 
         hue_txt->Disable();   
+
+        huerangeSlider->Disable();
+        huerange_txt->Disable();
     }
     else if (selection == 1) { // RGB mode
         lightnessSlider->Disable();
@@ -426,6 +448,9 @@ void MyFrame::UpdateSliders() {
 
         hueSlider->Disable(); 
         hue_txt->Disable();   
+
+        huerangeSlider->Disable();
+        huerange_txt->Disable();
     }
     else if (selection == 2) { // CMY mode
         lightnessSlider->Disable();
@@ -447,6 +472,9 @@ void MyFrame::UpdateSliders() {
 
         hueSlider->Disable(); 
         hue_txt->Disable();   
+
+        huerangeSlider->Disable();
+        huerange_txt->Disable();
     }
     else if (selection == 3)//hue mode
     {
@@ -469,6 +497,9 @@ void MyFrame::UpdateSliders() {
 
         hueSlider->Enable(); 
         hue_txt->Enable();   
+
+        huerangeSlider->Enable();
+        huerange_txt->Enable();
     }
 }
 double MyFrame::Calculate_Color_Factor  (const double& rc, const double& gm, const double& by, const int& rc_low, const int& gm_low, const int& by_low) const {
