@@ -39,3 +39,5 @@ The goal of this project is to create software that can load an image file in JP
 ## Lightness based partial desaturation
 ![Partially desaturated image, with respect to lighting](images/examples/desaturated_1.jpg)
 
+# GUI
+![GUI](images/examples/GUI.png)
