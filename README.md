@@ -30,8 +30,12 @@ The goal of this project is to create software that can load an image file in JP
    - Access the `Help` menu for more information about using the application.
 
 # Examples
+## Original image
 ![Original Image](images/test/test_1.jpg)
+## Fully desaturated image
 ![Fully desaturated image](images/examples/full_desaturation.jpg)
+## Hue based partial desaturation
 ![Partially desaturated image, with respect to hue](images/examples/hue_based_desaturation.jpg)
+## Lightness based partial desaturation
 ![Partially desaturated image, with respect to lighting](images/examples/desaturated_1.jpg)
 
